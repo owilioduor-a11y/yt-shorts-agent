@@ -152,6 +152,8 @@ def _sapi_tts(text: str, out_path: Path) -> TTSOutput:
 
     Produces a WAV via PowerShell, transcodes to MP3 with ffmpeg, and estimates
     word timings by even pacing (SAPI does not expose word boundaries).
+    Prefers a male voice (settings.sapi_voice -> 'Microsoft David Desktop'),
+    falling back to the first installed male voice if that one is missing.
     """
     import shutil
     import subprocess
@@ -163,6 +165,12 @@ def _sapi_tts(text: str, out_path: Path) -> TTSOutput:
         "Add-Type -AssemblyName System.Speech; "
         f"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
         f"$s.Rate = {settings.sapi_rate}; "
+        f"$wanted = '{settings.sapi_voice}'; "
+        "$names = $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }; "
+        "if ($names -contains $wanted) { $s.SelectVoice($wanted) } "
+        "else { $male = $names | Where-Object { $_ -match 'David|Mark|Guy|James|George|Christopher|Brian' } | Select-Object -First 1; "
+        "if ($male) { $s.SelectVoice($male) } }; "
+        "Write-Output ('selected-voice=' + $s.Voice.Name); "
         f"$s.SetOutputToWaveFile('{wav}'); "
         f"$s.Speak('{safe}'); $s.Dispose()"
     )
@@ -171,6 +179,9 @@ def _sapi_tts(text: str, out_path: Path) -> TTSOutput:
         capture_output=True,
         text=True,
     )
+    voice_line = next((l.strip() for l in (proc.stdout or "").splitlines() if "selected-voice=" in l), "?")
+    selected_voice = voice_line.split("=", 1)[1]
+    log.info("sapi voice selected: %s", selected_voice)
     if proc.returncode != 0 or not wav.exists():
         raise RuntimeError(f"sapi TTS failed: {proc.stderr[-500:]}")
     ffmpeg = shutil.which("ffmpeg")

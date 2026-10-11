@@ -34,6 +34,11 @@ video compositor**, wired to a small set of free/hosted APIs.
 ### Step 2 — Voice-over generation (`agent/tts.py`)
 - **Default**: `edge-tts` (free Microsoft Edge neural voices, no API key) with
   word-boundary timings streamed straight from the engine.
+- **Voice**: male, natural narration by default — `EDGE_VOICE=en-US-GuyNeural`
+  (alternatives: `en-US-ChristopherNeural`, `en-US-EricNeural`). Pacing is tuned
+  to a natural-but-energetic `+8%` rate with no pitch shift. If edge-tts is
+  unreachable, `TTS_FALLBACK=sapi` uses the Windows male voice
+  (`Microsoft David Desktop`, falls back to the first installed male voice).
 - **Optional**: ElevenLabs (`TTS_ENGINE=elevenlabs`) — same interface; word
   timings come back in the response headers.
 - Output: `voice.mp3` + `voice.words.json` (word → start/end seconds) that drive

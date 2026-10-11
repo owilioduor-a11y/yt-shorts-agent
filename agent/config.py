@@ -64,9 +64,10 @@ class Settings:
     tts_engine: str = field(default_factory=lambda: _env("TTS_ENGINE", "edge").lower())
     tts_fallback: str = field(default_factory=lambda: _env("TTS_FALLBACK", "none").lower())
     edge_voice: str = field(default_factory=lambda: _env("EDGE_VOICE", "en-US-AriaNeural"))
-    tts_rate: str = field(default_factory=lambda: _env("TTS_RATE", "+12%"))
-    tts_pitch: str = field(default_factory=lambda: _env("TTS_PITCH", "+2Hz"))
-    sapi_rate: int = field(default_factory=lambda: _env_int("SAPI_RATE", 2))
+    tts_rate: str = field(default_factory=lambda: _env("TTS_RATE", "+8%"))
+    tts_pitch: str = field(default_factory=lambda: _env("TTS_PITCH", "+0Hz"))
+    sapi_rate: int = field(default_factory=lambda: _env_int("SAPI_RATE", 1))
+    sapi_voice: str = field(default_factory=lambda: _env("SAPI_VOICE", "Microsoft David Desktop"))
     elevenlabs_api_key: str = field(default_factory=lambda: _env("ELEVENLABS_API_KEY"))
     elevenlabs_voice_id: str = field(
         default_factory=lambda: _env("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
