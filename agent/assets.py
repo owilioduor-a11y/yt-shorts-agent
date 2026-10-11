@@ -46,7 +46,8 @@ def _normalise_term(script_text: str, niche: str) -> str:
     for key, mapped in priority.items():
         if key in words:
             return mapped
-    return words[0] if words else {"cybersecurity": "cybersecurity", "programming": "computer code", "crypto": "bitcoin"}[niche]
+    defaults = {"cybersecurity": "cybersecurity", "programming": "computer code", "crypto": "bitcoin"}
+    return words[0] if words else defaults.get(niche, "technology")
 
 
 def _pexels_search(term: str) -> Optional[str]:
@@ -93,10 +94,14 @@ def fetch_backgrounds(script_text: str, niche: str, cache_dir: Path, count: int 
     done: set[int] = set()
     for provider, kind in (("pexels", "video"), ("pixabay", "video"), ("pixabay", "image")):
         url = None
-        if provider == "pexels":
-            url = _pexels_search(term)
-        else:
-            url = _pixabay_search(term, kind)
+        try:
+            if provider == "pexels":
+                url = _pexels_search(term)
+            else:
+                url = _pixabay_search(term, kind)
+        except requests.RequestException as exc:
+            log.warning("stock search failed [%s/%s]: %s", provider, kind, exc)
+            continue
         if not url:
             continue
         cache_key = hash((provider, url)) & 0xFFFFFFFF

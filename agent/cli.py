@@ -93,7 +93,16 @@ def cmd_sample(args) -> int:
     return 0 if videos else 1
 
 
+def _configure_stdio() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main() -> int:
+    _configure_stdio()
     parser = argparse.ArgumentParser(prog="yt-shorts-agent", description="Autonomous faceless YouTube Shorts agent")
     sub = parser.add_subparsers(dest="command", required=True)
 

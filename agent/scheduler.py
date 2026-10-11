@@ -36,9 +36,19 @@ def _daily_job() -> None:
         log.exception("pipeline crashed: %s", exc)
 
 
+def _parse_hhmm(value: str, default: str) -> tuple[int, int]:
+    try:
+        hour, minute = value.split(":")
+        return int(hour), int(minute)
+    except (ValueError, AttributeError):
+        log.warning("invalid GENERATE_TIME %r; using %s", value, default)
+        hour, minute = default.split(":")
+        return int(hour), int(minute)
+
+
 def serve() -> None:
     scheduler = BlockingScheduler(timezone=tz)
-    hour, minute = settings.generate_time.split(":")
+    hour, minute = _parse_hhmm(settings.generate_time, "05:00")
     scheduler.add_job(
         _daily_job,
         CronTrigger(hour=int(hour), minute=int(minute), timezone=tz),

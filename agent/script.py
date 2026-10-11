@@ -1,7 +1,8 @@
 """Step 1: pick the day's best stories and write 50-second scripts."""
 from __future__ import annotations
 
-import json
+import html
+import re
 from typing import Dict, List
 
 from .config import settings
@@ -99,6 +100,55 @@ def select_and_write(items_by_niche: Dict[str, List[NewsItem]]) -> List[Script]:
     return scripts[: settings.videos_per_day]
 
 
+def _clean_summary(summary: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", summary or "")
+    return html.unescape(re.sub(r"\s+", " ", text)).strip()
+
+
+def _fallback_scripts(items_by_niche: Dict[str, List[NewsItem]]) -> List[Script]:
+    """Deterministic scripts from the top-ranked headlines when the LLM is down."""
+    used: set[str] = set()
+    scripts: List[Script] = []
+    for niche in settings.niche_mix:
+        item = next(
+            (i for i in items_by_niche.get(niche, []) if i.url and i.url not in used),
+            None,
+        )
+        if item is None:
+            continue
+        used.add(item.url)
+        summary = _clean_summary(item.summary)
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", summary) if s.strip()]
+        body = " ".join(sentences[:3]) or "Here is what we know so far."
+        hook = item.title.strip().rstrip(".") + "."
+        scripts.append(
+            Script(
+                niche=niche,
+                source_title=item.title,
+                source_url=item.url,
+                hook=hook,
+                body=body,
+                cta="Follow for your daily tech intel.",
+                title=item.title,
+            )
+        )
+        if len(scripts) >= settings.videos_per_day:
+            break
+    log.info("fallback wrote %d script(s) from headlines", len(scripts))
+    return scripts
+
+
 def build_daily_scripts() -> List[Script]:
-    items = fetch_all()
-    return select_and_write(items)
+    try:
+        items = fetch_all()
+    except Exception as exc:
+        log.error("news sourcing failed: %s", exc)
+        return []
+    try:
+        scripts = select_and_write(items)
+    except Exception as exc:
+        log.warning("LLM scripting failed (%s); using deterministic fallback", exc)
+        scripts = []
+    if not scripts:
+        scripts = _fallback_scripts(items)
+    return scripts

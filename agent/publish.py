@@ -117,6 +117,7 @@ def upload_video(
 
 def schedule_four_videos(videos: list[RenderedVideo], peak_hours: list[str]) -> list[RenderedVideo]:
     """Assign publishAt timestamps to the daily 4 across peak hours (local tz)."""
+    peak_hours = list(peak_hours) or ["07:00", "12:30", "17:00", "21:00"]
     today = datetime.now().date()
     for i, vid in enumerate(videos):
         hh, mm = peak_hours[i % len(peak_hours)].split(":")

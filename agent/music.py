@@ -50,11 +50,15 @@ def fetch_royalty_free_track(job_dir: Path, cue: str) -> Optional[ClipAsset]:
     """Optional CC0 fetch from Pixabay Music API (100 req/hour free)."""
     if not settings.pixabay_api_key:
         return None
-    resp = requests.get(
-        "https://pixabay.com/api/",
-        params={"key": settings.pixabay_api_key, "q": cue, "per_page": 5, "music_type": "music"},
-        timeout=30,
-    )
+    try:
+        resp = requests.get(
+            "https://pixabay.com/api/",
+            params={"key": settings.pixabay_api_key, "q": cue, "per_page": 5, "music_type": "music"},
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        log.warning("music search failed: %s", exc)
+        return None
     if resp.status_code != 200:
         return None
     hits = resp.json().get("hits", [])

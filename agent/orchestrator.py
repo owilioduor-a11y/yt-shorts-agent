@@ -46,17 +46,31 @@ def build_one(script: Script, job_dir: Path, index: int, date_str: str) -> Optio
         log.error("TTS failed for %s: %s", script.niche, exc)
         return None
 
-    duration = voice.duration or float(voice.words[-1].end) if voice.words else 0.0
+    voice_audio = Path(voice.audio_path) if voice.audio_path else assets_dir / "voice.mp3"
+
+    duration = float(voice.duration) if voice.duration else (
+        float(voice.words[-1].end) if voice.words else 0.0
+    )
     if duration > settings.max_seconds:
         log.warning("voice is %.0fs (cap %ss); client re-truncates", duration, settings.max_seconds)
     duration = min(duration, float(settings.max_seconds)) or float(settings.target_seconds)
 
     words: List[WordTiming] = [w for w in voice.words if w.end <= duration + 0.05]
 
-    # ---- 3a. visuals + music
-    backgrounds = fetch_backgrounds(script.full_text, script.niche, count=3, cache_dir=assets_dir)
+    # ---- 3a. visuals + music (best-effort: never abort the video on stock/API errors)
+    try:
+        backgrounds = fetch_backgrounds(script.full_text, script.niche, count=3, cache_dir=assets_dir)
+    except Exception as exc:
+        log.warning("background fetch failed for %s: %s", script.niche, exc)
+        backgrounds = []
     music_cues = ["energetic tech", "trendy corporate", "upbeat news", "hip hop beat"]
-    music = pick_track(assets_dir) or fetch_royalty_free_track(assets_dir, cue=music_cues[index % len(music_cues)])
+    try:
+        music = pick_track(assets_dir) or fetch_royalty_free_track(
+            assets_dir, cue=music_cues[index % len(music_cues)]
+        )
+    except Exception as exc:
+        log.warning("music fetch failed: %s", exc)
+        music = None
 
     # ---- 4. metadata
     try:
@@ -75,7 +89,7 @@ def build_one(script: Script, job_dir: Path, index: int, date_str: str) -> Optio
             hook=script.hook,
             duration_seconds=duration,
             words=words,
-            voice_mp3=assets_dir / "voice.mp3",
+            voice_mp3=voice_audio,
             backgrounds=backgrounds,
             music=music,
             assets_dir=assets_dir,
@@ -94,7 +108,7 @@ def build_one(script: Script, job_dir: Path, index: int, date_str: str) -> Optio
         niche=script.niche,
         script=script,
         metadata=meta,
-        audio_path=str(assets_dir / "voice.mp3"),
+        audio_path=str(voice_audio),
         video_path=str(final_mp4),
         duration_seconds=round(duration, 2),
     )
@@ -109,28 +123,39 @@ def run_pipeline(*, upload: Optional[bool] = None, count: Optional[int] = None,
     jobs_root.mkdir(parents=True, exist_ok=True)
 
     if scripts is None:
-        scripts = build_daily_scripts()
+        try:
+            scripts = build_daily_scripts()
+        except Exception as exc:
+            log.error("script generation failed: %s", exc)
+            return []
     scripts = scripts[: settings.videos_per_day] if count is None else scripts[:count]
     log.info("pipeline: %d scripts today", len(scripts))
 
     videos: List[RenderedVideo] = []
     for i, script in enumerate(scripts):
-        job_dir = jobs_root / f"{date_str}-{i+1}-{script.niche}-{slugify(script.title or script.hook)}"
-        if job_dir.exists():
-            # already built today; reuse the artifact if present
-            finals = list(job_dir.rglob("*.mp4"))
-            if finals:
-                videos.append(_rehydrate(job_dir, finals[0], script, i, date_str))
-                continue
-        vid = build_one(script, job_dir, i, date_str)
-        if vid:
-            videos.append(vid)
+        try:
+            job_dir = jobs_root / f"{date_str}-{i+1}-{script.niche}-{slugify(script.title or script.hook)}"
+            if job_dir.exists():
+                # already built today; reuse the artifact if present
+                finals = list(job_dir.rglob("*.mp4"))
+                if finals:
+                    videos.append(_rehydrate(job_dir, finals[0], script, i, date_str))
+                    continue
+            vid = build_one(script, job_dir, i, date_str)
+            if vid:
+                videos.append(vid)
+        except Exception as exc:
+            log.exception("job %d (%s) failed: %s", i + 1, script.niche, exc)
+            continue
 
     if not videos:
         log.warning("no videos produced today")
         return []
 
-    videos = schedule_four_videos(videos, settings.peak_hours[: len(videos)])
+    try:
+        videos = schedule_four_videos(videos, settings.peak_hours[: len(videos)])
+    except Exception as exc:
+        log.warning("could not compute publish schedule: %s", exc)
     manifest = save_manifest(videos, date_str)
 
     upload = settings.auto_upload if upload is None else upload
