@@ -1,0 +1,9 @@
+feedparser>=6.0.11
+edge-tts>=7.0.0
+requests>=2.32.0
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+apscheduler>=3.10.4
+openai>=1.60.0
+google-api-python-client>=2.130.0
+google-auth-oauthlib>=1.2.0

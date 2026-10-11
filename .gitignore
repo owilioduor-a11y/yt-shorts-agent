@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+credentials/*.json
+!credentials/.gitkeep
+video/node_modules/
+video/public/bg/
+video/public/jobs/
+video/props/
+video/out/
+*.mp4
+.DS_Store

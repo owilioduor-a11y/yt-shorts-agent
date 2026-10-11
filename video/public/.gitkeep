@@ -1,0 +1,4 @@
+place generated/static assets for Remotion here (gitignored)
+
+- jobs/      staged per-job media (created automatically)
+- bg/        optional hand-picked background clips you can reuse
