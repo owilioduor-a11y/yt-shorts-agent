@@ -67,13 +67,22 @@ class LLMClient:
                     return self._dispatch(system, user, model, temperature, max_tokens, json_mode)
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
+                    # A JSON-format rejection is deterministic for this model; let
+                    # json() retry the whole call without response_format instead.
+                    if json_mode and "json_validate_failed" in str(exc):
+                        break
                     wait = 2 ** attempt
                     log.warning("LLM %s/%s failed (%s); retry in %ss", self.provider, model, exc, wait)
                     time.sleep(wait)
         raise LLMError(f"all LLM attempts failed: {last_error}")
 
     def json(self, system: str, user: str, *, temperature: float = 0.6, max_tokens: int = 1500) -> Any:
-        raw = self.chat(system, user, temperature=temperature, max_tokens=max_tokens, json_mode=True)
+        try:
+            raw = self.chat(system, user, temperature=temperature, max_tokens=max_tokens, json_mode=True)
+            return _extract_json(raw)
+        except LLMError as exc:
+            log.warning("JSON-mode call failed (%s); retrying without response_format", exc)
+        raw = self.chat(system, user, temperature=temperature, max_tokens=max_tokens, json_mode=False)
         return _extract_json(raw)
 
     # --------------------------------------------------------------- private

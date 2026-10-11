@@ -78,10 +78,10 @@ def select_and_write(items_by_niche: Dict[str, List[NewsItem]]) -> List[Script]:
     )
 
     llm = get_llm()
-    data = llm.json(SCRIPT_SYSTEM, user, temperature=0.75, max_tokens=2000)
+    data = llm.json(SCRIPT_SYSTEM, user, temperature=0.75, max_tokens=4096)
     scripts: List[Script] = []
     by_url = {item.url: item for item in flat}
-    for entry in data.get("scripts", []):
+    for entry in data.get("scripts", []) if isinstance(data, dict) else []:
         url = entry.get("source_url", "")
         source = by_url.get(url)
         scripts.append(
@@ -105,9 +105,11 @@ def _clean_summary(summary: str) -> str:
     return html.unescape(re.sub(r"\s+", " ", text)).strip()
 
 
-def _fallback_scripts(items_by_niche: Dict[str, List[NewsItem]]) -> List[Script]:
+def _fallback_scripts(
+    items_by_niche: Dict[str, List[NewsItem]], exclude: set[str] | None = None
+) -> List[Script]:
     """Deterministic scripts from the top-ranked headlines when the LLM is down."""
-    used: set[str] = set()
+    used: set[str] = set(exclude or ())
     scripts: List[Script] = []
     for niche in settings.niche_mix:
         item = next(
@@ -151,4 +153,7 @@ def build_daily_scripts() -> List[Script]:
         scripts = []
     if not scripts:
         scripts = _fallback_scripts(items)
-    return scripts
+    elif len(scripts) < settings.videos_per_day:
+        used = {s.source_url for s in scripts if s.source_url}
+        scripts = scripts + _fallback_scripts(items, exclude=used)
+    return scripts[: settings.videos_per_day]

@@ -12,4 +12,5 @@ video/public/jobs/
 video/props/
 video/out/
 *.mp4
+*.log
 .DS_Store

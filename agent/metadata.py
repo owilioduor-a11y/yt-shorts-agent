@@ -49,9 +49,11 @@ def generate_metadata(script: Script, niche_default: str) -> Metadata:
         f"{META_SCHEMA_HINT}"
     )
     try:
-        data = llm.json(META_SYSTEM, user, temperature=0.55, max_tokens=700)
+        data = llm.json(META_SYSTEM, user, temperature=0.55, max_tokens=2048)
     except Exception as exc:  # never block the pipeline on copywriting
         return fallback(str(exc))
+    if not isinstance(data, dict):
+        return fallback(f"LLM returned {type(data).__name__}, expected dict")
     title = str(data.get("title", "")).strip()[:60]
     tags = [str(t).strip().lower() for t in data.get("tags", []) if str(t).strip()]
     if not title:

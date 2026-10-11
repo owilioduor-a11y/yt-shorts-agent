@@ -155,12 +155,13 @@ def _sapi_tts(text: str, out_path: Path) -> TTSOutput:
     Prefers a male voice (settings.sapi_voice -> 'Microsoft David Desktop'),
     falling back to the first installed male voice if that one is missing.
     """
+    import base64
     import shutil
     import subprocess
 
     text = _clip_text(text)
     wav = out_path.with_suffix(".wav")
-    safe = text.replace("'", "''")
+    payload = base64.b64encode(text.encode("utf-8")).decode("ascii")
     ps = (
         "Add-Type -AssemblyName System.Speech; "
         f"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
@@ -171,19 +172,21 @@ def _sapi_tts(text: str, out_path: Path) -> TTSOutput:
         "else { $male = $names | Where-Object { $_ -match 'David|Mark|Guy|James|George|Christopher|Brian' } | Select-Object -First 1; "
         "if ($male) { $s.SelectVoice($male) } }; "
         "Write-Output ('selected-voice=' + $s.Voice.Name); "
+        "$txt = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("
+        f"'{payload}')); "
         f"$s.SetOutputToWaveFile('{wav}'); "
-        f"$s.Speak('{safe}'); $s.Dispose()"
+        "$s.Speak($txt); $s.Dispose()"
     )
     proc = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
         capture_output=True,
         text=True,
     )
-    voice_line = next((l.strip() for l in (proc.stdout or "").splitlines() if "selected-voice=" in l), "?")
-    selected_voice = voice_line.split("=", 1)[1]
-    log.info("sapi voice selected: %s", selected_voice)
     if proc.returncode != 0 or not wav.exists():
-        raise RuntimeError(f"sapi TTS failed: {proc.stderr[-500:]}")
+        raise RuntimeError(f"sapi TTS failed: {(proc.stderr or '')[-500:]}")
+    voice_line = next((l.strip() for l in (proc.stdout or "").splitlines() if "selected-voice=" in l), "")
+    selected_voice = voice_line.split("=", 1)[1] if "=" in voice_line else "default"
+    log.info("sapi voice selected: %s", selected_voice)
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg and out_path.suffix == ".mp3":
         conv = subprocess.run(
