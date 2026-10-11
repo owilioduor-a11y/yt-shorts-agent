@@ -52,9 +52,9 @@ class Settings:
     llm_provider: str = field(default_factory=lambda: _env("LLM_PROVIDER", "groq").lower())
     groq_api_key: str = field(default_factory=lambda: _env("GROQ_API_KEY"))
     gemini_api_key: str = field(default_factory=lambda: _env("GEMINI_API_KEY"))
-    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "gpt-oss-120b"))
+    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "openai/gpt-oss-120b"))
     llm_fallback_model: str = field(
-        default_factory=lambda: _env("LLM_FALLBACK_MODEL", "gpt-oss-20b")
+        default_factory=lambda: _env("LLM_FALLBACK_MODEL", "openai/gpt-oss-20b")
     )
     ollama_base_url: str = field(
         default_factory=lambda: _env("OLLAMA_BASE_URL", "http://localhost:11434/v1")
